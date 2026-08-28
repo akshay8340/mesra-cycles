@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Clock, Wallet, Sunset } from "lucide-react";
 
 const Home = () => {
   return (
@@ -30,6 +31,9 @@ const Home = () => {
               List Your Cycle
             </Link>
           </div>
+          <p className="mt-4 text-sm text-ink/60">
+            Graduating or upgrading? <Link to="/marketplace" className="text-forest font-semibold underline underline-offset-2">Sell your cycle on the Marketplace</Link> instead.
+          </p>
         </div>
         <div className="bg-forest rounded-3xl p-10 text-sage relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-32 h-32 bg-amber/20 rounded-full"></div>
@@ -46,7 +50,7 @@ const Home = () => {
               </li>
               <li className="flex gap-3">
                 <span className="w-7 h-7 shrink-0 rounded-full bg-amber text-forest font-bold flex items-center justify-center text-sm">3</span>
-                <span>Owner accepts, you meet up, ride, and pay directly (cash/UPI).</span>
+                <span>Owner accepts, you meet up, ride, and pay cash — no app payments.</span>
               </li>
             </ol>
           </div>
@@ -57,21 +61,27 @@ const Home = () => {
       <section className="bg-white border-y border-forest/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid sm:grid-cols-3 gap-8">
           <div>
-            <div className="text-3xl mb-3">⏱️</div>
+            <div className="w-11 h-11 rounded-xl bg-forest/10 text-forest flex items-center justify-center mb-3">
+              <Clock size={20} strokeWidth={2} />
+            </div>
             <h3 className="font-display font-bold text-forest text-lg mb-1">Save time</h3>
             <p className="text-ink/60 text-sm">
               No more sprinting from hostel to class. Grab a cycle from someone free that hour.
             </p>
           </div>
           <div>
-            <div className="text-3xl mb-3">💸</div>
+            <div className="w-11 h-11 rounded-xl bg-forest/10 text-forest flex items-center justify-center mb-3">
+              <Wallet size={20} strokeWidth={2} />
+            </div>
             <h3 className="font-display font-bold text-forest text-lg mb-1">Earn a little</h3>
             <p className="text-ink/60 text-sm">
               Your cycle sits idle during your classes anyway — list it and earn some pocket money.
             </p>
           </div>
           <div>
-            <div className="text-3xl mb-3">🌆</div>
+            <div className="w-11 h-11 rounded-xl bg-forest/10 text-forest flex items-center justify-center mb-3">
+              <Sunset size={20} strokeWidth={2} />
+            </div>
             <h3 className="font-display font-bold text-forest text-lg mb-1">Evening rides</h3>
             <p className="text-ink/60 text-sm">
               Want to explore campus in the evening? Rent a cycle for an hour or two, hassle-free.

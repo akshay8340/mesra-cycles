@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Bike } from "lucide-react";
 import api from "../api/axios";
 import CycleCard from "../components/CycleCard";
 
@@ -11,7 +12,7 @@ const BrowseCycles = () => {
   useEffect(() => {
     const fetchCycles = async () => {
       try {
-        const { data } = await api.get("/cycles");
+        const { data } = await api.get("/cycles", { params: { type: "rent" } });
         setCycles(data);
       } catch (err) {
         setError("Could not load cycles. Please try again.");
@@ -31,7 +32,10 @@ const BrowseCycles = () => {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <h1 className="font-display text-3xl font-bold text-forest">Browse Cycles</h1>
+        <div>
+          <h1 className="font-display text-3xl font-bold text-forest">Rent a Cycle</h1>
+          <p className="text-ink/60 text-sm mt-1">Hourly rentals from hostel-mates near you.</p>
+        </div>
         <input
           type="text"
           placeholder="Search by name or location..."
@@ -46,7 +50,7 @@ const BrowseCycles = () => {
 
       {!loading && !error && filtered.length === 0 && (
         <div className="text-center py-20 bg-white rounded-2xl border border-forest/10">
-          <p className="text-4xl mb-3">🚲</p>
+          <Bike size={40} strokeWidth={1.5} className="mx-auto mb-3 text-forest/30" />
           <p className="text-ink/60">No cycles available right now. Check back later!</p>
         </div>
       )}

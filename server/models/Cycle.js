@@ -7,6 +7,11 @@ const cycleSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    listingType: {
+      type: String,
+      enum: ["rent", "sell"],
+      default: "rent",
+    },
     title: {
       type: String,
       required: [true, "Cycle title is required"],
@@ -16,13 +21,23 @@ const cycleSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    photo: {
+    photos: {
+      type: [String],
+      default: [],
+    },
+    video: {
       type: String,
       default: "",
     },
+    // Used when listingType === "rent"
     pricePerHour: {
       type: Number,
-      required: [true, "Price per hour is required"],
+      default: 0,
+    },
+    // Used when listingType === "sell"
+    price: {
+      type: Number,
+      default: 0,
     },
     location: {
       type: String,

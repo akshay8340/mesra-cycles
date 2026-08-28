@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import BrowseCycles from "./pages/BrowseCycles";
+import Marketplace from "./pages/Marketplace";
 import CycleDetail from "./pages/CycleDetail";
 import AddCycle from "./pages/AddCycle";
 import MyBookings from "./pages/MyBookings";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/browse" element={<BrowseCycles />} />
+          <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/cycles/:id" element={<CycleDetail />} />
           <Route
             path="/add-cycle"

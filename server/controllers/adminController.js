@@ -52,6 +52,8 @@ const getAllCycles = async (req, res) => {
 };
 
 // @route PUT /api/admin/cycles/:id/approve
+// Listings go live immediately when created — this toggle is just for admin
+// moderation (hide a listing without deleting it).
 const toggleApproveCycle = async (req, res) => {
   try {
     const cycle = await Cycle.findById(req.params.id);
@@ -59,6 +61,7 @@ const toggleApproveCycle = async (req, res) => {
 
     cycle.isApproved = !cycle.isApproved;
     await cycle.save();
+
     res.json(cycle);
   } catch (error) {
     res.status(500).json({ message: error.message });

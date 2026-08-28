@@ -1,5 +1,18 @@
 const Booking = require("../models/Booking");
 const Cycle = require("../models/Cycle");
+const notify = require("../utils/notify");
+
+// Strip renter/owner phone numbers from a booking unless it's accepted/completed —
+// contact details only unlock once the owner accepts the request.
+const sanitizeBooking = (bookingDoc) => {
+  const booking = bookingDoc.toObject();
+  const contactUnlocked = ["accepted", "completed"].includes(booking.status);
+  if (!contactUnlocked) {
+    if (booking.owner?.phone) delete booking.owner.phone;
+    if (booking.renter?.phone) delete booking.renter.phone;
+  }
+  return booking;
+};
 
 // @route POST /api/bookings
 const createBooking = async (req, res) => {
@@ -12,6 +25,10 @@ const createBooking = async (req, res) => {
 
     const cycle = await Cycle.findById(cycleId);
     if (!cycle) return res.status(404).json({ message: "Cycle not found" });
+
+    if (cycle.listingType !== "rent") {
+      return res.status(400).json({ message: "This listing is not available for rent booking" });
+    }
 
     if (cycle.owner.toString() === req.user._id.toString()) {
       return res.status(400).json({ message: "You cannot book your own cycle" });
@@ -36,13 +53,19 @@ const createBooking = async (req, res) => {
       totalCost,
     });
 
+    await notify(
+      cycle.owner,
+      `${req.user.name} requested to book your cycle "${cycle.title}"`,
+      "/my-bookings"
+    );
+
     const populated = await booking.populate([
-      { path: "cycle", select: "title photo location pricePerHour" },
+      { path: "cycle", select: "title photos location pricePerHour" },
       { path: "owner", select: "name phone" },
       { path: "renter", select: "name phone" },
     ]);
 
-    res.status(201).json(populated);
+    res.status(201).json(sanitizeBooking(populated));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -52,10 +75,10 @@ const createBooking = async (req, res) => {
 const getMyBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ renter: req.user._id })
-      .populate("cycle", "title photo location pricePerHour")
+      .populate("cycle", "title photos location pricePerHour")
       .populate("owner", "name phone")
       .sort({ createdAt: -1 });
-    res.json(bookings);
+    res.json(bookings.map(sanitizeBooking));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -65,10 +88,11 @@ const getMyBookings = async (req, res) => {
 const getReceivedBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ owner: req.user._id })
-      .populate("cycle", "title photo location pricePerHour")
+      .populate("cycle", "title photos location pricePerHour")
       .populate("renter", "name phone")
       .sort({ createdAt: -1 });
-    res.json(bookings);
+    // Owner always sees the renter's contact once a request lands — they're the one approving it
+    res.json(bookings.map((b) => b.toObject()));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -83,7 +107,7 @@ const updateBookingStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate("cycle", "title");
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     const isOwner = booking.owner.toString() === req.user._id.toString();
@@ -103,6 +127,14 @@ const updateBookingStatus = async (req, res) => {
 
     booking.status = status;
     await booking.save();
+
+    if (status === "accepted" || status === "rejected") {
+      await notify(
+        booking.renter,
+        `Your booking for "${booking.cycle.title}" was ${status} by the owner`,
+        "/my-bookings"
+      );
+    }
 
     res.json(booking);
   } catch (error) {

@@ -1,43 +1,64 @@
-const streamifier = require("stream");
 const Cycle = require("../models/Cycle");
+const Booking = require("../models/Booking");
 const cloudinary = require("../config/cloudinary");
 
-// Helper: upload buffer to cloudinary
-const uploadToCloudinary = (buffer) => {
+// Helper: upload a single buffer to Cloudinary, image or video
+const uploadToCloudinary = (buffer, resourceType = "image") => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
-      { folder: "cycle-rental" },
+      { folder: "cycle-rental", resource_type: resourceType },
       (error, result) => {
         if (result) resolve(result);
         else reject(error);
       }
     );
-    streamifier.Readable.from(buffer).pipe(uploadStream);
+    uploadStream.end(buffer);
   });
+};
+
+const uploadPhotos = async (files = []) => {
+  const uploads = files.map((file) => uploadToCloudinary(file.buffer, "image"));
+  const results = await Promise.all(uploads);
+  return results.map((r) => r.secure_url);
 };
 
 // @route POST /api/cycles
 const addCycle = async (req, res) => {
   try {
-    const { title, description, pricePerHour, location } = req.body;
+    const { listingType, title, description, pricePerHour, price, location } = req.body;
+    const type = listingType === "sell" ? "sell" : "rent";
 
-    if (!title || !pricePerHour || !location) {
+    if (!title || !location) {
       return res.status(400).json({ message: "Please fill all required fields" });
     }
+    if (type === "rent" && !pricePerHour) {
+      return res.status(400).json({ message: "Price per hour is required for a rent listing" });
+    }
+    if (type === "sell" && !price) {
+      return res.status(400).json({ message: "Price is required for a sell listing" });
+    }
 
-    let photoUrl = "";
-    if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      photoUrl = result.secure_url;
+    let photoUrls = [];
+    let videoUrl = "";
+
+    if (req.files?.photos?.length) {
+      photoUrls = await uploadPhotos(req.files.photos);
+    }
+    if (req.files?.video?.[0]) {
+      const result = await uploadToCloudinary(req.files.video[0].buffer, "video");
+      videoUrl = result.secure_url;
     }
 
     const cycle = await Cycle.create({
       owner: req.user._id,
+      listingType: type,
       title,
       description,
-      pricePerHour,
+      pricePerHour: type === "rent" ? pricePerHour : 0,
+      price: type === "sell" ? price : 0,
       location,
-      photo: photoUrl,
+      photos: photoUrls,
+      video: videoUrl,
     });
 
     res.status(201).json(cycle);
@@ -46,11 +67,15 @@ const addCycle = async (req, res) => {
   }
 };
 
-// @route GET /api/cycles  (browse all available cycles, excludes own cycles optionally)
+// @route GET /api/cycles?type=rent|sell  (browse live listings)
 const getCycles = async (req, res) => {
   try {
-    const cycles = await Cycle.find({ isAvailable: true, isApproved: true })
-      .populate("owner", "name phone hostel")
+    const { type } = req.query;
+    const filter = { isAvailable: true, isApproved: true };
+    if (type === "rent" || type === "sell") filter.listingType = type;
+
+    const cycles = await Cycle.find(filter)
+      .populate("owner", "name hostel")
       .sort({ createdAt: -1 });
     res.json(cycles);
   } catch (error) {
@@ -61,7 +86,7 @@ const getCycles = async (req, res) => {
 // @route GET /api/cycles/:id
 const getCycleById = async (req, res) => {
   try {
-    const cycle = await Cycle.findById(req.params.id).populate("owner", "name phone hostel");
+    const cycle = await Cycle.findById(req.params.id).populate("owner", "name hostel");
     if (!cycle) return res.status(404).json({ message: "Cycle not found" });
     res.json(cycle);
   } catch (error) {
@@ -69,7 +94,7 @@ const getCycleById = async (req, res) => {
   }
 };
 
-// @route GET /api/cycles/mine  (cycles listed by logged in user)
+// @route GET /api/cycles/mine  (listings created by logged in user)
 const getMyCycles = async (req, res) => {
   try {
     const cycles = await Cycle.find({ owner: req.user._id }).sort({ createdAt: -1 });
@@ -89,16 +114,20 @@ const updateCycle = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to edit this cycle" });
     }
 
-    const { title, description, pricePerHour, location, isAvailable } = req.body;
+    const { title, description, pricePerHour, price, location, isAvailable } = req.body;
 
-    if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      cycle.photo = result.secure_url;
+    if (req.files?.photos?.length) {
+      cycle.photos = await uploadPhotos(req.files.photos);
+    }
+    if (req.files?.video?.[0]) {
+      const result = await uploadToCloudinary(req.files.video[0].buffer, "video");
+      cycle.video = result.secure_url;
     }
 
     cycle.title = title ?? cycle.title;
     cycle.description = description ?? cycle.description;
-    cycle.pricePerHour = pricePerHour ?? cycle.pricePerHour;
+    if (cycle.listingType === "rent") cycle.pricePerHour = pricePerHour ?? cycle.pricePerHour;
+    if (cycle.listingType === "sell") cycle.price = price ?? cycle.price;
     cycle.location = location ?? cycle.location;
     if (isAvailable !== undefined) cycle.isAvailable = isAvailable;
 
@@ -126,4 +155,47 @@ const deleteCycle = async (req, res) => {
   }
 };
 
-module.exports = { addCycle, getCycles, getCycleById, getMyCycles, updateCycle, deleteCycle };
+// @route GET /api/cycles/:id/contact
+// Sell listings: any logged-in user can see the seller's contact directly.
+// Rent listings: the renter only sees the owner's contact once a booking is accepted.
+const getCycleContact = async (req, res) => {
+  try {
+    const cycle = await Cycle.findById(req.params.id).populate("owner", "name phone hostel");
+    if (!cycle) return res.status(404).json({ message: "Cycle not found" });
+
+    const isOwner = cycle.owner._id.toString() === req.user._id.toString();
+
+    if (isOwner) {
+      return res.json({ name: cycle.owner.name, phone: cycle.owner.phone, hostel: cycle.owner.hostel });
+    }
+
+    if (cycle.listingType === "sell") {
+      return res.json({ name: cycle.owner.name, phone: cycle.owner.phone, hostel: cycle.owner.hostel });
+    }
+
+    // Rent listing — require an accepted/completed booking by this renter for this cycle
+    const hasAccess = await Booking.exists({
+      cycle: cycle._id,
+      renter: req.user._id,
+      status: { $in: ["accepted", "completed"] },
+    });
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Contact details unlock once the owner accepts your booking" });
+    }
+
+    res.json({ name: cycle.owner.name, phone: cycle.owner.phone, hostel: cycle.owner.hostel });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  addCycle,
+  getCycles,
+  getCycleById,
+  getMyCycles,
+  updateCycle,
+  deleteCycle,
+  getCycleContact,
+};

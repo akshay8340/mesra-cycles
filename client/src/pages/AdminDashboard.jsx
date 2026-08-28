@@ -129,8 +129,9 @@ const AdminDashboard = () => {
             <thead className="bg-sage text-forest text-left">
               <tr>
                 <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Price/hr</th>
+                <th className="px-4 py-3">Price</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -139,11 +140,14 @@ const AdminDashboard = () => {
               {cycles.map((c) => (
                 <tr key={c._id} className="border-t border-forest/5">
                   <td className="px-4 py-3">{c.title}</td>
+                  <td className="px-4 py-3 capitalize">{c.listingType}</td>
                   <td className="px-4 py-3">{c.owner?.name}</td>
-                  <td className="px-4 py-3">₹{c.pricePerHour}</td>
+                  <td className="px-4 py-3">
+                    {c.listingType === "sell" ? `₹${c.price}` : `₹${c.pricePerHour}/hr`}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs ${c.isApproved ? "bg-forest/10 text-forest" : "bg-amber/20 text-amber-dark"}`}>
-                      {c.isApproved ? "Approved" : "Hidden"}
+                      {c.isApproved ? "Live" : "Hidden"}
                     </span>
                   </td>
                   <td className="px-4 py-3 flex gap-2">
